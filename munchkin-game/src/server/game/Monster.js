@@ -7,12 +7,18 @@ class Monster extends DungeonCard {
     this.level = level;
     this.treasureReward = treasureReward;
     this.badStuff = badStuff;
+    this.modifiers = []; // Inicializado como array vazio
     this.combatPower = this.calculateCombatPower();
-    this.modifiers = [];
   }
 
   calculateCombatPower() {
-    // Base combat power is monster level plus any modifiers
+    // Proteção para garantir que `modifiers` é sempre um array
+    if (!Array.isArray(this.modifiers)) {
+      console.error('Modifiers is not an array:', this.modifiers);
+      this.modifiers = [];
+    }
+
+    // Base combat power é o nível do monstro somado aos modificadores
     let totalPower = this.level;
     this.modifiers.forEach(mod => {
       if (mod.type === 'MULTIPLY') {
@@ -36,14 +42,30 @@ class Monster extends DungeonCard {
   }
 
   addModifier(modifier) {
-    this.modifiers.push(modifier);
+    // Proteção para validar o modificador antes de adicionar
+    if (!modifier || typeof modifier !== 'object') {
+      console.error('Invalid modifier:', modifier);
+      return;
+    }
+
+    this.modifiers = [...this.modifiers, modifier];
     this.combatPower = this.calculateCombatPower();
   }
 
   play() {
-    // Monsters are typically played by initiating combat
-    // The actual combat logic is handled by the Combat class
-    return this.fight(Game.getInstance().getCurrentPlayer());
+    // Monstros geralmente são jogados iniciando o combate
+    // A lógica do combate é tratada pela classe Combat
+    const gameInstance = Game.getInstance();
+    if (!gameInstance) {
+      console.error('Game instance not found');
+      return;
+    }
+    const currentPlayer = gameInstance.getCurrentPlayer();
+    if (!currentPlayer) {
+      console.error('Current player not found');
+      return;
+    }
+    return this.fight(currentPlayer);
   }
 }
 

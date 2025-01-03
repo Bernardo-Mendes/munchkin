@@ -1,0 +1,332 @@
+<title>Munchkin Game</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+    :root {
+        --primary: #8b4513;
+        --secondary: #d2691e;
+        --background: #fdf5e6;
+        --card-bg: #fff;
+        --text: #2d2d2d;
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        background-color: var(--background);
+        color: var(--text);
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    /* Login Screen */
+    .login-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+    }
+
+    .login-form {
+        background: var(--card-bg);
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Game Board */
+    .game-board {
+        display: none;
+        grid-template-columns: 200px 1fr 200px;
+        gap: 20px;
+        height: 100vh;
+    }
+
+    /* Player Info */
+    .player-info {
+        background: var(--card-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+    /* Card Styles */
+    .card {
+        background: var(--card-bg);
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+    }
+
+    .hand {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 1rem;
+    }
+
+    /* Combat Area */
+    .combat-area {
+        background: rgba(139, 69, 19, 0.1);
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+    }
+
+    /* Buttons */
+    .btn {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 0.5rem;
+    }
+
+    .btn:hover {
+        background: var(--secondary);
+    }
+
+    /* Game Log */
+    .game-log {
+        background: var(--card-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        height: 200px;
+        overflow-y: auto;
+    }
+
+    .log-entry {
+        margin-bottom: 0.5rem;
+        padding: 0.5rem;
+        border-bottom: 1px solid #eee;
+    }
+</style>
+</head>
+<body>
+<!-- Login Screen -->
+<div class="login-screen" id="loginScreen">
+    <div class="login-form">
+        <h2>Join Munchkin Game</h2>
+        <input type="text" id="playerName" placeholder="Enter your name" />
+        <button class="btn" onclick="joinGame()">Join Game</button>
+    </div>
+</div>
+
+<!-- Game Board -->
+<div class="game-board" id="gameBoard">
+    <!-- Left Sidebar - Player Info -->
+    <div class="sidebar">
+        <div class="player-info" id="playerInfo">
+            <h3>Player Info</h3>
+            <div id="playerStats"></div>
+        </div>
+        <div class="other-players" id="otherPlayers">
+            <h3>Other Players</h3>
+        </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="main-area">
+        <div class="combat-area" id="combatArea">
+            <h3>Combat Area</h3>
+            <div id="currentCombat"></div>
+            <div class="combat-buttons">
+                <button class="btn" onclick="kickDoor()">Kick Down Door</button>
+                <button class="btn" onclick="lookForTrouble()">Look For Trouble</button>
+                <button class="btn" onclick="lootRoom()">Loot the Room</button>
+                <button class="btn" onclick="runAway()">Run Away</button>
+            </div>
+        </div>
+        <div class="hand" id="playerHand">
+            <h3>Your Hand</h3>
+        </div>
+    </div>
+
+    <!-- Right Sidebar - Game Log -->
+    <div class="sidebar">
+        <div class="game-log" id="gameLog">
+            <h3>Game Log</h3>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Connect to Socket.IO server
+    const socket = io('http://localhost:3000');
+    let currentPlayer = null;
+    let gameState = null;
+
+    // Socket event handlers
+    socket.on('connect', () => {
+        console.log('Connected to server');
+    });
+
+    socket.on('playerJoined', (data) => {
+        addToGameLog(`${data.message}`);
+        updatePlayersList(data.players);
+    });
+
+    socket.on('gameStateUpdated', (state) => {
+        gameState = state;
+        updateGameState();
+    });
+
+    socket.on('error', (error) => {
+        addToGameLog(`Error: ${error}`);
+    });
+
+    // Game functions
+    function joinGame() {
+        const playerName = document.getElementById('playerName').value;
+        if (!playerName) return;
+
+        socket.emit('joinGame', { name: playerName });
+        currentPlayer = { name: playerName, id: socket.id };
+        
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('gameBoard').style.display = 'grid';
+        
+        updatePlayerInfo();
+    }
+
+    function kickDoor() {
+        if (gameState?.currentPlayer !== currentPlayer.id) {
+            addToGameLog("It's not your turn!");
+            return;
+        }
+        socket.emit('playCard', { action: 'kickDoor' });
+    }
+
+    function lookForTrouble() {
+        if (gameState?.currentPlayer !== currentPlayer.id) {
+            addToGameLog("It's not your turn!");
+            return;
+        }
+        socket.emit('playCard', { action: 'lookForTrouble' });
+    }
+
+    function lootRoom() {
+        if (gameState?.currentPlayer !== currentPlayer.id) {
+            addToGameLog("It's not your turn!");
+            return;
+        }
+        socket.emit('playCard', { action: 'lootRoom' });
+    }
+
+    function runAway() {
+        if (gameState?.currentPlayer !== currentPlayer.id) {
+            addToGameLog("It's not your turn!");
+            return;
+        }
+        socket.emit('playCard', { action: 'runAway' });
+    }
+
+    function playCard(cardId) {
+        if (gameState?.currentPlayer !== currentPlayer.id) {
+            addToGameLog("It's not your turn!");
+            return;
+        }
+        socket.emit('playCard', { cardId });
+    }
+
+    // UI update functions
+    function updateGameState() {
+        updatePlayerInfo();
+        updateCombatArea();
+        updatePlayerHand();
+        highlightCurrentPlayer();
+    }
+
+    function updatePlayerInfo() {
+        const player = gameState?.players.find(p => p.id === currentPlayer.id);
+        if (!player) return;
+
+        document.getElementById('playerStats').innerHTML = `
+            <p>Name: ${player.name}</p>
+            <p>Level: ${player.level}</p>
+            <p>Combat Power: ${player.combatPower}</p>
+            <p>Race: ${player.race || 'None'}</p>
+            <p>Class: ${player.class || 'None'}</p>
+        `;
+    }
+
+    function updatePlayersList(players) {
+        const otherPlayers = players.filter(p => p.id !== currentPlayer.id);
+        document.getElementById('otherPlayers').innerHTML = `
+            <h3>Other Players</h3>
+            ${otherPlayers.map(p => `
+                <div class="player-info">
+                    <p>Name: ${p.name}</p>
+                    <p>Level: ${p.level}</p>
+                </div>
+            `).join('')}
+        `;
+    }
+
+    function updateCombatArea() {
+        // Update combat area based on game state
+        const combatArea = document.getElementById('currentCombat');
+        if (gameState?.combat) {
+            combatArea.innerHTML = `
+                <h4>Current Combat</h4>
+                <p>Monster: ${gameState.combat.monster.name}</p>
+                <p>Level: ${gameState.combat.monster.level}</p>
+            `;
+        } else {
+            combatArea.innerHTML = '<p>No combat in progress</p>';
+        }
+    }
+
+    function updatePlayerHand() {
+        // Update player's hand display
+        const handDiv = document.getElementById('playerHand');
+        if (gameState?.currentPlayer === currentPlayer.id) {
+            handDiv.innerHTML = gameState.players
+                .find(p => p.id === currentPlayer.id)
+                ?.hand.map(card => `
+                    <div class="card" onclick="playCard('${card.id}')">
+                        <h4>${card.name}</h4>
+                        <p>${card.description}</p>
+                    </div>
+                `).join('') || '';
+        }
+    }
+
+    function highlightCurrentPlayer() {
+        // Highlight current player's turn
+        const players = document.querySelectorAll('.player-info');
+        players.forEach(p => {
+            p.style.border = p.id === gameState?.currentPlayer ? 
+                '2px solid var(--primary)' : '1px solid #ccc';
+        });
+    }
+
+    function addToGameLog(message) {
+        const log = document.getElementById('gameLog');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.textContent = message;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+    }
+</script>
+</body>
+</html>

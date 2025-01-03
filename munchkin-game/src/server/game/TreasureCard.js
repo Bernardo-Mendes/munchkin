@@ -1,5 +1,5 @@
 // TreasureCard.js
-const Card = require('./Card');
+const { Card } = require('./Card');
 
 class TreasureCard extends Card {
   constructor(id, name, description, value, type) {

@@ -1,7 +1,7 @@
 // DungeonDeck.js
-const Deck = require('./Deck');
-const Monster = require('./Monster');
-const CurseCard = require('./CurseCard');
+const { Deck } = require('./Deck');
+const { Monster } = require('./Monster');
+const { CurseCard } = require('./CurseCard');
 
 class DungeonDeck extends Deck {
   constructor() {

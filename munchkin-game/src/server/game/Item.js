@@ -1,5 +1,5 @@
 // Item.js
-const TreasureCard = require('./TreasureCard');
+const { TreasureCard } = require('./TreasureCard');
 
 class Item extends TreasureCard {
   constructor(id, name, description, value, bonus, slot, requirements = []) {

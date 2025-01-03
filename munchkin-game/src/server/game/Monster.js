@@ -1,5 +1,5 @@
 // Monster.js
-const DungeonCard = require('./DungeonCard');
+const { DungeonCard } = require('./DungeonCard');
 
 class Monster extends DungeonCard {
   constructor(id, name, description, level, treasureReward, badStuff) {

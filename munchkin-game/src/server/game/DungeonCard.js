@@ -1,5 +1,5 @@
 // DungeonCard.js
-const Card = require('./Card');
+const { Card } = require('./Card');
 
 class DungeonCard extends Card {
   constructor(id, name, description, type) {

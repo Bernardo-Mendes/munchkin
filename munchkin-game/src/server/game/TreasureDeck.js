@@ -1,6 +1,6 @@
 // TreasureDeck.js
-const Deck = require('./Deck');
-const Item = require('./Item');
+const { Deck } = require('./Deck');
+const { Item } = require('./Item');
 const TreasureCard = require('./TreasureCard');
 
 class TreasureDeck extends Deck {

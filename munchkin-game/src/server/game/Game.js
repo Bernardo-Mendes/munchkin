@@ -1,6 +1,6 @@
-const Player = require('./Player');
-const DungeonDeck = require('./DungeonDeck');
-const TreasureDeck = require('./TreasureDeck');
+const { Player } = require('./Player');
+const { DungeonDeck } = require('./DungeonDeck');
+const { TreasureDeck } = require('./TreasureDeck');
 
 class Game {
   static instance = null;

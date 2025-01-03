@@ -1,78 +1,85 @@
-const EventEmitter = require('events');
+const express = require('express');
+const router = express.Router();
+const Game = require('../game/Game');
+const gameEvents = require('../game/GameEvents');
 
-class GameEvents extends EventEmitter {
-  constructor() {
-    super();
-    this.registerEvents();
+// Middleware to get game instance
+const getGame = (req, res, next) => {
+  req.game = Game.getInstance();
+  next();
+};
+
+// Get game state
+router.get('/state', getGame, (req, res) => {
+  try {
+    const gameState = req.game.getGameState();
+    res.json({ success: true, state: gameState });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
+});
 
-  registerEvents() {
-    // Game state events
-    this.on('gameStateUpdate', (gameState) => {
-      this.broadcastToPlayers('gameStateUpdated', gameState);
-    });
-
-    // Combat events
-    this.on('combatStart', (data) => {
-      this.broadcastToPlayers('combatStarted', {
-        player: data.player.name,
-        monster: data.monster.name,
-        monsterLevel: data.monster.level
-      });
-    });
-
-    this.on('combatEnd', (data) => {
-      this.broadcastToPlayers('combatEnded', {
-        winner: data.winner,
-        rewards: data.rewards,
-        consequences: data.consequences
-      });
-    });
-
-    // Player events
-    this.on('playerJoin', (player) => {
-      this.broadcastToPlayers('playerJoined', {
-        id: player.id,
-        name: player.name,
-        level: player.level
-      });
-    });
-
-    this.on('playerLeave', (player) => {
-      this.broadcastToPlayers('playerLeft', {
-        id: player.id,
-        name: player.name
-      });
-    });
-
-    // Card events
-    this.on('cardPlayed', (data) => {
-      this.broadcastToPlayers('cardWasPlayed', {
-        playerId: data.player.id,
-        cardName: data.card.name,
-        effect: data.effect
-      });
-    });
-
-    // Turn events
-    this.on('turnChange', (data) => {
-      this.broadcastToPlayers('turnChanged', {
-        currentPlayer: data.currentPlayer.name,
-        phase: data.phase
-      });
-    });
+// Start game
+router.post('/start', getGame, (req, res) => {
+  try {
+    req.game.startGame();
+    const gameState = req.game.getGameState();
+    gameEvents.emit('gameStateUpdate', gameState);
+    res.json({ success: true, state: gameState });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
   }
+});
 
-  broadcastToPlayers(eventName, data) {
-    // This method will be set by the socket.io configuration
-    if (this.socketIO) {
-      this.socketIO.to('game-room').emit(eventName, data);
+// Play a card
+router.post('/play-card', getGame, (req, res) => {
+  try {
+    const { playerId, cardId } = req.body;
+    const player = req.game.players.find(p => p.id === playerId);
+    
+    if (!player) {
+      throw new Error('Player not found');
     }
-  }
 
-  setSocketIO(io) {
-    this.socketIO = io;
-  }
-}
+    const card = player.hand.find(c => c.id === cardId);
+    if (!card) {
+      throw new Error('Card not found');
+    }
 
-module.exports = new GameEvents();
+    const result = card.play();
+    gameEvents.emit('cardPlayed', { player, card, effect: result });
+    
+    const gameState = req.game.getGameState();
+    gameEvents.emit('gameStateUpdate', gameState);
+    
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Handle combat action
+router.post('/combat', getGame, (req, res) => {
+  try {
+    const { action, playerId, targetId } = req.body;
+    const player = req.game.players.find(p => p.id === playerId);
+    const currentTurn = req.game.getCurrentTurn();
+    
+    if (!currentTurn.combatInProgress) {
+      throw new Error('No combat in progress');
+    }
+
+    const result = currentTurn.executePhase({
+      type: action,
+      playerId: targetId
+    });
+
+    gameEvents.emit('gameStateUpdate', req.game.getGameState());
+    
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router;
